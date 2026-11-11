@@ -1,4 +1,11 @@
 terraform {
+  backend "s3" {
+    bucket  = "pgr301-terraform-state"
+    key     = "wishifai/26/terraform.tfstate"
+    region  = "eu-west-1"
+    encrypt = true
+  }
+
   required_version = ">= 1.6"
   required_providers {
     aws = { source = "hashicorp/aws", version = ">= 6.23.0" }
