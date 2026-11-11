@@ -1,7 +1,7 @@
 variable "region" {
   type        = string
   description = "AWS_region ressursene opprettes"
-  default     =  "eu-west-1"
+  default     = "eu-west-1"
 }
 
 variable "candidate" {
@@ -10,14 +10,14 @@ variable "candidate" {
 }
 
 variable "image_tag" {
-  type = string
+  type        = string
   description = "Tag (commit-SHA) på imaget i ECR som skal deployes"
 }
 
 variable "bedrock_model_id" {
-  type = string
+  type        = string
   description = "Bedrock inference profile / modell-ID"
-  default = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+  default     = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
 }
 
 

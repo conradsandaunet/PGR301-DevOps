@@ -19,7 +19,7 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 resource "aws_s3_bucket" "images" {
-  bucket = "wishifai-${var.candidate}"
+  bucket        = "wishifai-${var.candidate}"
   force_destroy = true
 }
 
@@ -36,14 +36,14 @@ data "aws_iam_policy_document" "task_assume" {
     actions = ["sts:AssumeRole"]
     principals {
       identifiers = ["ecs-tasks.amazonaws.com"]
-      type = "Service"
+      type        = "Service"
     }
   }
 }
 
 resource "aws_iam_role" "task" {
-  name                       = "wishifai-task-${var.candidate}"
-  assume_role_policy         = data.aws_iam_policy_document.task_assume.json
+  name               = "wishifai-task-${var.candidate}"
+  assume_role_policy = data.aws_iam_policy_document.task_assume.json
 }
 
 data "aws_iam_policy_document" "task_permissions" {
@@ -60,7 +60,7 @@ data "aws_iam_policy_document" "task_permissions" {
   }
 
   statement {
-    sid = "InvokeModel"
+    sid     = "InvokeModel"
     actions = ["bedrock:InvokeModel"]
     resources = [
       "arn:aws:bedrock:${var.region}:${data.aws_caller_identity.current.account_id}:inference-profile/${var.bedrock_model_id}",
@@ -69,12 +69,12 @@ data "aws_iam_policy_document" "task_permissions" {
   }
 
   statement {
-    sid = "PutMetrics"
-    actions = ["cloudwatch:PutMetricData"]
+    sid       = "PutMetrics"
+    actions   = ["cloudwatch:PutMetricData"]
     resources = ["*"]
     condition {
       test     = "StringEquals"
-      values = ["wishifai"]
+      values   = ["wishifai"]
       variable = "cloudwatch:namespace"
     }
   }
@@ -91,14 +91,14 @@ resource "aws_ecs_express_gateway_service" "app" {
   execution_role_arn      = "arn:aws:iam::244530008913:role/ecsTaskExecutionRole"
   infrastructure_role_arn = "arn:aws:iam::244530008913:role/service-role/ecsInfrastructureRoleForExpressServices"
   task_role_arn           = aws_iam_role.task.arn
-  health_check_path = "/actuator/health"
+  health_check_path       = "/actuator/health"
 
   primary_container {
     image          = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.region}.amazonaws.com/wishifai:${var.image_tag}"
     container_port = 8080
 
     environment {
-      name = "S3_BUCKET"
+      name  = "S3_BUCKET"
       value = aws_s3_bucket.images.bucket
     }
 
