@@ -74,7 +74,7 @@ data "aws_iam_policy_document" "task_permissions" {
     resources = ["*"]
     condition {
       test     = "StringEquals"
-      values   = ["wishifai"]
+      values   = ["wishifai-${var.candidate}"]
       variable = "cloudwatch:namespace"
     }
   }
