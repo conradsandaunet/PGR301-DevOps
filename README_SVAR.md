@@ -76,3 +76,35 @@ Det er fornuftig at Terraform kjører etter container-build fordi Terraform refe
 kjørte før eller parallelt, kunne tjenesten peke på et image som ikke finnes enda, og deploy ville feilet.
 Etter build er imaget garantert i ECR, så det som deployes er det som ble bygget fra akkurat den commiten.
 Hvis build feiler, stoppes pipelinen før noe infrastruktur endres.
+
+## Oppgave 3 - Observability
+
+### 3A - Metrics
+
+**Metrics og hvorfor:**
+
+- **Timere på de to eksterne kallene:** Rekognition og Bedrock er de dyre og trege delene av forespørselen. I testene mine brukte Rekognition under ett sekund, mens Bedrock brukte rundt 16 sekunder per kall. Timerne viser at Bedrock er flaskehalsen.
+- **`gifts.suggested` (business-metric):** Teller hvor mye verdi tjenesten faktisk leverer, altså antall gaveforslag brukerne får. Den sier noe om bruk, ikke bare teknisk helse.
+- **`gifts.per.prompt`:** Prompten ber om inntil fem forslag. Fordelingen viser om modellen leverer færre enn forventet, som er en kvalitetsindikator.
+- **`bedrock.parse.failures`:** Modellen skal svare med gyldig JSON, men det er ikke alltid garantert. Telleren viser hvor ofte appen faller tilbake til "ukjent format", og fanger opp endringer i modellatferd.
+
+### 3B - Dashboard og alarm
+
+Dashboard og alarm kode ligger i `infra/monitoring.tf`.
+
+**Metrikkene på dashboard**
+
+- Business; `gifts.suggested` (Sum); Viser hvor mye verdi tjenesten leverer, altså antall gaveforslag.
+- Business; `gifts.per.prompt` (sum/count); Snitt forslag per prompt. Viser om modellen leverer det vi ber om.
+- Applikasjon; `bedrock.converse.duration` (sum/count); Gjennomsnittlig Bedrock-tid. Det tregeste leddet.
+- Applikasjon; `rekognition.detectlabels.duration` (sum/count); Gjennomsnittlig Rekognition-tid.
+- Applikasjon; `jvm.gc.overhead`; Viser om garbage collection spiser CPU-tid, en tidlig indikator på minneproblemer.
+- Infrastruktur; `CPUUtilization` og `MemoryUtilization`; Viser om tjenesten er over- eller underdimensjonert.
+
+**Alarm: `wishifai-parse-failures-26`**
+
+- **Hva den varsler på:** `bedrock.parse.failures.count` > 1 i løpet av 5 minutter.
+- **Hvorfor:** Modellen kan gi et svar som ikke kan parses som JSON, og det er et ubrukelig resultat. Appen faller da tilbake til et "ukjent format"-svar uten å kaste en feil. Så problemet vises ikke i en vanlig feilstatistikk. Dette fanger opp noe standard helsesjekk ikke ser.
+- **Terskel og periode:** Én parsefeil er nok til å varsle, siden hvert tilfelle er en dårlig brukeropplevelse og trafikken er lav. 5 minutter matcher oppløsningen på eksporten.
+- **Manglende data:** `treat_missing_data = notBreaching, fordi ingen trafikk ikke betyr feil.
+- **Varsling:** Alarmen sender til et SNS-topic. E-postabonnement er valgfritt.
