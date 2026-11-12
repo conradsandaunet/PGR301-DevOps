@@ -5,7 +5,7 @@ variable "alarm_email" {
 }
 
 locals {
-  metrics_namespace = "whishifai-${var.candidate}"
+  metrics_namespace = "wishifai-${var.candidate}"
 }
 
 resource "aws_sns_topic" "alarms" {
@@ -20,7 +20,7 @@ resource "aws_sns_topic_subscription" "email" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "parse_failures" {
-  alarm_name          = "whishifai-parse-failures-${var.candidate}"
+  alarm_name          = "wishifai-parse-failures-${var.candidate}"
   alarm_description   = "Bedrock-svar som ikke kunne parses som JSON"
   namespace           = local.metrics_namespace
   metric_name         = "bedrock.parse.failures.count"
@@ -125,5 +125,5 @@ resource "aws_cloudwatch_dashboard" "main" {
 }
 
 output "dashboard_name" {
-  value = "aws_cloudwatch_dashboard.main.dashboard_name"
+  value = aws_cloudwatch_dashboard.main.dashboard_name
 }
