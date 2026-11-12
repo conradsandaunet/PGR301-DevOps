@@ -1,6 +1,9 @@
 package no.pgr301.exam.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import no.pgr301.exam.model.GiftAnalysis;
 import no.pgr301.exam.model.GiftSuggestion;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +14,8 @@ import software.amazon.awssdk.services.bedrockruntime.model.ConversationRole;
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseRequest;
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse;
 import software.amazon.awssdk.services.bedrockruntime.model.Message;
+import io.micrometer.core.instrument.Timer;
+
 
 import java.util.List;
 import java.util.regex.Matcher;
@@ -25,10 +30,29 @@ public class BedrockService {
     private final BedrockRuntimeClient client;
     private final String modelId;
 
+    private final Timer converseTimer;
+    private final Counter giftsSuggested;
+    private final DistributionSummary giftsPerPrompt;
+    private final Counter parseFailures;
+
     public BedrockService(BedrockRuntimeClient client,
-                          @Value("${app.bedrock.model-id}") String modelId) {
+                          @Value("${app.bedrock.model-id}") String modelId,
+                          MeterRegistry registry) {
         this.client = client;
         this.modelId = modelId;
+
+        this.converseTimer = Timer.builder("bedrock.converse.duration")
+                .description("Tid for Bedrock Converse-kallet")
+                .register(registry);
+        this.giftsSuggested = Counter.builder("gifts.suggested")
+                .description("Totalt antall genererte gaveforslag")
+                .register(registry);
+        this.giftsPerPrompt = DistributionSummary.builder("gifts.per.prompt")
+                .description("Antall gaveforslag per prompt")
+                .register(registry);
+        this.parseFailures = Counter.builder("bedrock.parse.failures")
+                .description("Antall ganger svaret fra modellen ikke kunne parse til JSON")
+                .register(registry);
     }
 
     /**
@@ -86,16 +110,22 @@ public class BedrockService {
                 }
                 """.formatted(String.join(", ", labels));
 
-        ConverseResponse resp = client.converse(ConverseRequest.builder()
+        ConverseResponse resp = converseTimer.record(() ->
+                client.converse(ConverseRequest.builder()
                 .modelId(modelId)
                 .messages(Message.builder()
                         .role(ConversationRole.USER)
                         .content(ContentBlock.fromText(prompt))
                         .build())
-                .build());
+                .build()));
 
         String text = resp.output().message().content().get(0).text();
-        return parseAnalysis(text);
+        GiftAnalysis analysis = parseAnalysis(text);
+
+        int count = analysis.suggestions().size();
+        giftsSuggested.increment(count);
+        giftsPerPrompt.record(count);
+        return analysis;
     }
 
     private GiftAnalysis parseAnalysis(String text) {
@@ -104,6 +134,7 @@ public class BedrockService {
             String json = m.find() ? m.group() : text;
             return MAPPER.readValue(json, GiftAnalysis.class);
         } catch (Exception e) {
+            parseFailures.increment();
             return new GiftAnalysis(
                     "(ukjent)",
                     "(kunne ikke parse svar)",
