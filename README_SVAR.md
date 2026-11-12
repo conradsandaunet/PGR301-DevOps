@@ -23,7 +23,7 @@ docker run -p 9999:8080 \
 
 Workflow: `.github/workflows/docker.yml`. Den kjører kun ved push til `main`, logger inn mot AWS med Github Secrets, bygger imaget og pusher til ECR.
 
-Grønn kjøring: TODO lenke til Actions-kjøring
+Lenke til grønn kjøring: https://github.com/conradsandaunet/PGR301-DevOps/actions/runs/42629366743.
 
 **Tagging-stragegi:** Imaget tagges med full commit-SHA.
 Begrunnelse:
@@ -64,3 +64,15 @@ whishifai/26/terrafor.tfstate
 Begrunnelse:
 - Bøtta deles av klassen, så kandidatnummer i nøkkelen gjør at state-filen er unik.
 - Kandidatnummer er hardkodet fordi `backend`-blokken ikke støtter variabler.
+
+### 2C - Github Actions-job
+
+Workflow: `.github/workflows/docker.yml` har to jobs:
+1. `build and push` bygger og pusher imaget til ECR
+2. `terraform` har `needs: build and push`, og kjører `fmt -check`, `init`, `validate` og `apply` mot `/infra`.
+Lenke til grønn kjøring: https://github.com/conradsandaunet/PGR301-DevOps/actions/runs/43033394191.
+
+Det er fornuftig at Terraform kjører etter container-build fordi Terraform refererer til en bestemt image-tag. Hvis Terraform
+kjørte før eller parallelt, kunne tjenesten peke på et image som ikke finnes enda, og deploy ville feilet.
+Etter build er imaget garantert i ECR, så det som deployes er det som ble bygget fra akkurat den commiten.
+Hvis build feiler, stoppes pipelinen før noe infrastruktur endres.
